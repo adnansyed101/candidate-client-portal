@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Job {
+  id         String      @id @default(cuid())
+  title      String
+  candidates Candidate[]
+  formFields FormField[] // Dynamic configuration for this job's form
+  createdAt  DateTime    @default(now())
+}
+
+model FormField {
+  id       String  @id @default(cuid())
+  jobId    String
+  job      Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  type     String // "text" | "number" | "select" | "checkbox"
+  label    String
+  name     String // The unique key used in JSON data (e.g., "expected_salary")
+  required Boolean @default(false)
+  options  Json? // Optional: string array for select dropdown inputs like ["Junior", "Senior"]
+}
+
+model Candidate {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id])
+  name      String // Core static field
+  email     String // Core static field
+  // All dynamic admin-defined data is stored here mapped by FormField.name
+  data      Json // e.g., { "expected_salary": 60000, "remote_ok": true }
+  createdAt DateTime @default(now())
+}
