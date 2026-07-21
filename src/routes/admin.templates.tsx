@@ -41,6 +41,10 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
+import { useMutation } from '@tanstack/react-query'
+import axios from 'axios'
+
+// To anyone who will work in this file. The code is generated using lovable/ai. The conditions where the admin can create the form fields dynamically. I do not know how to do this. For which I used lovable. So use this only to create the form field.
 
 export const Route = createFileRoute('/admin/templates')({
   component: TemplatesBuilder,
@@ -112,6 +116,22 @@ const emptyTemplate = (): FormTemplate => ({
 })
 
 function TemplatesBuilder() {
+  const createTemplateMutation = useMutation({
+    mutationKey: ['createTemplate'],
+    mutationFn: async (newJob: any) => {
+      try {
+        const response = await axios.post('/api/template', newJob)
+        return response.data
+      } catch (error) {
+        // Handle database or other unexpected errors
+        return {
+          success: false,
+          error: 'Internal server error',
+          message: 'Internal server error',
+        }
+      }
+    },
+  })
   const [templates, setTemplates] = useState<FormTemplate[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<FormTemplate | null>(null)
@@ -202,12 +222,13 @@ function TemplatesBuilder() {
     }
     const payload = buildTemplatePayload(draft)
 
-    console.log(payload)
     // TODO: replace with your server action, e.g.
     //   await prisma.job.create({
     //     data: { title: payload.title, formFields: { create: payload.formFields } },
     //   });
-    console.log('Template payload for DB:', payload)
+    // console.log('Template payload for DB:', payload)
+    createTemplateMutation.mutate(payload)
+
     setTemplates((prev) => {
       const exists = prev.some((x) => x.id === draft.id)
       return exists
@@ -607,7 +628,7 @@ function FieldRow({
 
 function FormPreview({ template }: { template: FormTemplate }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-gradient-to-b from-white to-zinc-50 p-6 shadow-sm">
+    <div className="rounded-2xl border border-zinc-200 bg-linear-to-b from-white to-zinc-50 p-6 shadow-sm">
       <div className="flex items-center justify-between mb-5">
         <div>
           <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">

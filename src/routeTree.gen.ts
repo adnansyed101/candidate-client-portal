@@ -15,6 +15,7 @@ import { Route as ClientRouteImport } from './routes/client'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminJobsRouteImport } from './routes/admin.jobs'
 import { Route as AdminTemplatesRouteImport } from './routes/admin.templates'
+import { Route as ApiTemplateRouteImport } from './routes/api/template'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -47,6 +48,11 @@ const AdminTemplatesRoute = AdminTemplatesRouteImport.update({
   path: '/templates',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiTemplateRoute = ApiTemplateRouteImport.update({
+  id: '/api/template',
+  path: '/api/template',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/client': typeof ClientRoute
   '/admin/jobs': typeof AdminJobsRoute
   '/admin/templates': typeof AdminTemplatesRoute
+  '/api/template': typeof ApiTemplateRoute
   '/admin/': typeof AdminIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/client': typeof ClientRoute
   '/admin/jobs': typeof AdminJobsRoute
   '/admin/templates': typeof AdminTemplatesRoute
+  '/api/template': typeof ApiTemplateRoute
   '/admin': typeof AdminIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/client': typeof ClientRoute
   '/admin/jobs': typeof AdminJobsRoute
   '/admin/templates': typeof AdminTemplatesRoute
+  '/api/template': typeof ApiTemplateRoute
   '/admin/': typeof AdminIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/client'
     | '/admin/jobs'
     | '/admin/templates'
+    | '/api/template'
     | '/admin/'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/client'
     | '/admin/jobs'
     | '/admin/templates'
+    | '/api/template'
     | '/admin'
     | '/api/auth/$'
   id:
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/client'
     | '/admin/jobs'
     | '/admin/templates'
+    | '/api/template'
     | '/admin/'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
@@ -113,6 +125,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   ClientRoute: typeof ClientRoute
+  ApiTemplateRoute: typeof ApiTemplateRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -160,6 +173,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTemplatesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/template': {
+      id: '/api/template'
+      path: '/api/template'
+      fullPath: '/api/template'
+      preLoaderRoute: typeof ApiTemplateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -188,6 +208,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   ClientRoute: ClientRoute,
+  ApiTemplateRoute: ApiTemplateRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
