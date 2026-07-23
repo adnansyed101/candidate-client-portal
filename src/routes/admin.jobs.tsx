@@ -7,7 +7,15 @@ import { Plus, Briefcase, Users, ChevronRight, Eye, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  MultiSelect,
+  MultiSelectTrigger,
+  MultiSelectValue,
+  MultiSelectContent,
+  MultiSelectItem,
+} from '@/components/ui/multi-select'
 import {
   Dialog,
   DialogContent,
@@ -295,7 +303,9 @@ function JobsPage() {
                                   ? v
                                     ? 'Yes'
                                     : 'No'
-                                  : String(v)}
+                                  : Array.isArray(v)
+                                    ? v.join(', ')
+                                    : String(v)}
                             </TableCell>
                           )
                         })}
@@ -556,7 +566,9 @@ function CandidateDetailsDialog({
                       ? value
                         ? 'Yes'
                         : 'No'
-                      : String(value)}
+                      : Array.isArray(value)
+                        ? value.join(', ')
+                        : String(value)}
                 </span>
               </div>
             ))}
@@ -641,6 +653,72 @@ function DynamicField({
     )
   }
 
+  if (field.type === 'multi-select') {
+    const values = Array.isArray(form.watch(field.key))
+      ? (form.watch(field.key) as string[])
+      : []
+    return (
+      <FormField
+        control={form.control}
+        name={field.key}
+        render={({ field: f }) => (
+          <FormItem>
+            <FormLabel className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              {field.label}
+              {field.required && <span className="text-zinc-400 ml-1">*</span>}
+            </FormLabel>
+            <FormControl>
+              <MultiSelect
+                values={values}
+                onValuesChange={(v) => f.onChange(v)}
+              >
+                <MultiSelectTrigger className="w-full border-zinc-200">
+                  <MultiSelectValue
+                    placeholder={`Select ${field.label.toLowerCase()}`}
+                  />
+                </MultiSelectTrigger>
+                <MultiSelectContent>
+                  {(field.options ?? []).map((opt) => (
+                    <MultiSelectItem key={opt} value={opt} badgeLabel={opt}>
+                      {opt}
+                    </MultiSelectItem>
+                  ))}
+                </MultiSelectContent>
+              </MultiSelect>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    )
+  }
+
+  if (field.type === 'textarea') {
+    return (
+      <FormField
+        control={form.control}
+        name={field.key}
+        render={({ field: f }) => (
+          <FormItem>
+            <FormLabel className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              {field.label}
+              {field.required && <span className="text-zinc-400 ml-1">*</span>}
+            </FormLabel>
+            <FormControl>
+              <Textarea
+                {...f}
+                value={f.value as string}
+                className="border-zinc-200 min-h-24"
+                placeholder={`Enter ${field.label.toLowerCase()}`}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    )
+  }
+
   return (
     <FormField
       control={form.control}
@@ -655,12 +733,20 @@ function DynamicField({
             <Input
               {...f}
               value={f.value as string}
-              type={field.type === 'number' ? 'number' : 'text'}
+              type={
+                field.type === 'number'
+                  ? 'number'
+                  : field.type === 'calendar'
+                    ? 'date'
+                    : 'text'
+              }
               className="border-zinc-200"
               placeholder={
                 field.type === 'number'
                   ? '0'
-                  : `Enter ${field.label.toLowerCase()}`
+                  : field.type === 'calendar'
+                    ? 'Select a date'
+                    : `Enter ${field.label.toLowerCase()}`
               }
             />
           </FormControl>

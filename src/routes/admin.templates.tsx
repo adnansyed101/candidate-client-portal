@@ -29,7 +29,15 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import {
+  MultiSelect,
+  MultiSelectTrigger,
+  MultiSelectValue,
+  MultiSelectContent,
+  MultiSelectItem,
+} from '@/components/ui/multi-select'
 import { Switch } from '@/components/ui/switch'
 import {
   Select,
@@ -562,7 +570,7 @@ function FieldRow({
               onValueChange={(v) =>
                 onChange({
                   type: v as FieldType,
-                  options: v === 'select' ? (field.options ?? []) : undefined,
+                  options: v === 'select' || v === 'multi-select' ? (field.options ?? []) : undefined,
                 })
               }
             >
@@ -571,9 +579,12 @@ function FieldRow({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="text">Text</SelectItem>
+                <SelectItem value="textarea">Textarea</SelectItem>
                 <SelectItem value="number">Number</SelectItem>
                 <SelectItem value="select">Select</SelectItem>
+                <SelectItem value="multi-select">Multi Select</SelectItem>
                 <SelectItem value="checkbox">Checkbox</SelectItem>
+                <SelectItem value="calendar">Calendar</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -600,7 +611,7 @@ function FieldRow({
         </Button>
       </div>
 
-      {field.type === 'select' && (
+      {(field.type === 'select' || field.type === 'multi-select') && (
         <div className="mt-4 pt-4 border-t border-zinc-100">
           <Label className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
             Options
@@ -772,6 +783,32 @@ function PreviewField({ field }: { field: TemplateField }) {
             )}
           </SelectContent>
         </Select>
+      )}
+      {field.type === 'multi-select' && (
+        <MultiSelect>
+          <MultiSelectTrigger className={`${common} w-full`}>
+            <MultiSelectValue placeholder="Select options" />
+          </MultiSelectTrigger>
+          <MultiSelectContent>
+            {(field.options ?? []).length === 0 ? (
+              <div className="px-2 py-1.5 text-xs text-zinc-400">
+                No options
+              </div>
+            ) : (
+              (field.options ?? []).map((o, i) => (
+                <MultiSelectItem key={i} value={o} badgeLabel={o}>
+                  {o}
+                </MultiSelectItem>
+              ))
+            )}
+          </MultiSelectContent>
+        </MultiSelect>
+      )}
+      {field.type === 'textarea' && (
+        <Textarea placeholder={field.key || 'Enter value'} className={common} />
+      )}
+      {field.type === 'calendar' && (
+        <Input type="date" className={common} />
       )}
     </div>
   )
