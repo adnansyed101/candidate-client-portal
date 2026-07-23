@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Plus,
   Trash2,
@@ -40,9 +40,18 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { z } from 'zod'
 import { cn } from '@/lib/utils'
-import { useMutation } from '@tanstack/react-query'
-import axios from 'axios'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  type FieldType,
+  type TemplateField,
+  type FormTemplate,
+  type JobTemplatePayload,
+  PrismaJobSchema,
+  prismaJobToFormTemplate,
+  buildTemplatePayload,
+} from '@/lib/schemas'
 
 // To anyone who will work in this file. The code is generated using lovable/ai. The conditions where the admin can create the form fields dynamically. I do not know how to do this. For which I used lovable. So use this only to create the form field.
 
@@ -50,58 +59,7 @@ export const Route = createFileRoute('/admin/templates')({
   component: TemplatesBuilder,
 })
 
-export type FieldType = 'text' | 'number' | 'select' | 'checkbox'
 
-export type TemplateField = {
-  id: string
-  label: string
-  key: string
-  type: FieldType
-  required: boolean
-  options?: string[]
-}
-
-export type FormTemplate = {
-  id: string
-  name: string
-  description?: string
-  fields: TemplateField[]
-  createdAt: string
-}
-
-/** Prisma-shaped payload ready to persist as a Job + nested FormFields. */
-export type FormFieldPayload = {
-  type: FieldType
-  label: string
-  name: string
-  required: boolean
-  options: string[] | null
-}
-
-export type JobTemplatePayload = {
-  title: string
-  formFields: FormFieldPayload[]
-}
-
-/**
- * Maps the in-memory template draft to the exact shape expected by the
- * Prisma `Job` + `FormField` relation. Pass the returned object straight to
- * `prisma.job.create({ data: { title, formFields: { create: formFields } } })`.
- */
-export function buildTemplatePayload(
-  template: FormTemplate,
-): JobTemplatePayload {
-  return {
-    title: template.name.trim(),
-    formFields: template.fields.map((f) => ({
-      type: f.type,
-      label: f.label.trim(),
-      name: f.key.trim(),
-      required: f.required,
-      options: f.type === 'select' ? (f.options ?? []) : null,
-    })),
-  }
-}
 
 function uid(prefix = 'id') {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`
@@ -116,25 +74,82 @@ const emptyTemplate = (): FormTemplate => ({
 })
 
 function TemplatesBuilder() {
-  const createTemplateMutation = useMutation({
-    mutationKey: ['createTemplate'],
-    mutationFn: async (newJob: any) => {
-      try {
-        const response = await axios.post('/api/template', newJob)
-        return response.data
-      } catch (error) {
-        // Handle database or other unexpected errors
-        return {
-          success: false,
-          error: 'Internal server error',
-          message: 'Internal server error',
-        }
-      }
-    },
-  })
-  const [templates, setTemplates] = useState<FormTemplate[]>([])
+  const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<FormTemplate | null>(null)
+
+  const templatesQuery = useQuery({
+    queryKey: ['templates'],
+    queryFn: async (): Promise<FormTemplate[]> => {
+      const response = await fetch('/api/template')
+      const json = await response.json()
+      if (!json.success)
+        throw new Error(json.message ?? 'Failed to fetch templates')
+      const jobs = z.array(PrismaJobSchema).parse(json.data)
+      return jobs.map(prismaJobToFormTemplate)
+    },
+  })
+
+  const templates = templatesQuery.data ?? []
+
+  useEffect(() => {
+    if (templates.length > 0 && !selectedId) {
+      setSelectedId(templates[0].id)
+      setDraft(JSON.parse(JSON.stringify(templates[0])))
+    }
+  }, [templates, selectedId])
+
+  const createTemplateMutation = useMutation({
+    mutationKey: ['createTemplate'],
+    mutationFn: async (newJob: JobTemplatePayload) => {
+      const response = await fetch('/api/template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newJob),
+      })
+      const json = await response.json()
+      if (!json.success)
+        throw new Error(json.message ?? 'Failed to create template')
+      return json
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+    },
+  })
+
+  const updateTemplateMutation = useMutation({
+    mutationKey: ['updateTemplate'],
+    mutationFn: async (payload: JobTemplatePayload & { id: string }) => {
+      const response = await fetch('/api/template', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const json = await response.json()
+      if (!json.success)
+        throw new Error(json.message ?? 'Failed to update template')
+      return json
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+    },
+  })
+
+  const deleteTemplateMutation = useMutation({
+    mutationKey: ['deleteTemplate'],
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/template?id=${id}`, {
+        method: 'DELETE',
+      })
+      const json = await response.json()
+      if (!json.success)
+        throw new Error(json.message ?? 'Failed to delete template')
+      return json
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+    },
+  })
 
   const selectTemplate = (t: FormTemplate) => {
     setSelectedId(t.id)
@@ -221,21 +236,24 @@ function TemplatesBuilder() {
       return
     }
     const payload = buildTemplatePayload(draft)
+    const isUpdate = templates.some((t) => t.id === draft.id)
 
-    // TODO: replace with your server action, e.g.
-    //   await prisma.job.create({
-    //     data: { title: payload.title, formFields: { create: payload.formFields } },
-    //   });
-    // console.log('Template payload for DB:', payload)
-    createTemplateMutation.mutate(payload)
-
-    setTemplates((prev) => {
-      const exists = prev.some((x) => x.id === draft.id)
-      return exists
-        ? prev.map((x) => (x.id === draft.id ? draft : x))
-        : [...prev, draft]
-    })
-    toast.success(`Template "${draft.name}" ready to save`)
+    if (isUpdate) {
+      updateTemplateMutation.mutate(
+        { ...payload, id: draft.id },
+        {
+          onSuccess: () => {
+            toast.success(`Template "${draft.name}" updated`)
+          },
+        },
+      )
+    } else {
+      createTemplateMutation.mutate(payload, {
+        onSuccess: () => {
+          toast.success(`Template "${draft.name}" created`)
+        },
+      })
+    }
     return payload
   }
 
@@ -259,31 +277,35 @@ function TemplatesBuilder() {
           </Button>
         </div>
         <div className="flex-1 overflow-auto p-3 space-y-1">
-          {templates.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => selectTemplate(t)}
-              className={cn(
-                'w-full text-left p-3 rounded-lg border transition-all group',
-                selectedId === t.id
-                  ? 'border-zinc-900 bg-zinc-50'
-                  : 'border-transparent hover:bg-zinc-50',
-              )}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-zinc-900 truncate">
-                    {t.name || 'Untitled'}
-                  </p>
-                  <p className="text-xs text-zinc-500 mt-0.5">
-                    {t.fields.length} field{t.fields.length === 1 ? '' : 's'}
-                  </p>
+          {templatesQuery.isLoading ? (
+            <p className="text-xs text-zinc-400 p-4 text-center">Loading...</p>
+          ) : (
+            templates.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => selectTemplate(t)}
+                className={cn(
+                  'w-full text-left p-3 rounded-lg border transition-all group',
+                  selectedId === t.id
+                    ? 'border-zinc-900 bg-zinc-50'
+                    : 'border-transparent hover:bg-zinc-50',
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-zinc-900 truncate">
+                      {t.name || 'Untitled'}
+                    </p>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      {t.fields.length} field{t.fields.length === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                <ChevronRight className="h-4 w-4 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </button>
-          ))}
-          {templates.length === 0 && (
+              </button>
+            ))
+          )}
+          {!templatesQuery.isLoading && templates.length === 0 && (
             <p className="text-xs text-zinc-400 p-4 text-center">
               No templates yet
             </p>
@@ -318,13 +340,15 @@ function TemplatesBuilder() {
                   <Button
                     variant="outline"
                     size="sm"
+                    disabled={deleteTemplateMutation.isPending}
                     onClick={() => {
-                      setTemplates((prev) =>
-                        prev.filter((t) => t.id !== draft.id),
-                      )
-                      setDraft(null)
-                      setSelectedId(null)
-                      toast.success('Template deleted')
+                      deleteTemplateMutation.mutate(draft.id, {
+                        onSuccess: () => {
+                          setDraft(null)
+                          setSelectedId(null)
+                          toast.success('Template deleted')
+                        },
+                      })
                     }}
                     className="border-zinc-200 text-zinc-600"
                   >
